@@ -18,11 +18,7 @@ import android.widget.LinearLayout;
 import android.widget.TextClock;
 import android.widget.TextView;
 
-import java.util.Calendar;
-
 public class MainActivity extends Activity implements NowPlaying.Listener {
-
-    private static final String NAME = "Jhon";
 
     private static final String MAPS = "com.google.android.apps.maps/com.google.android.maps.MapsActivity";
     private static final String EQ = "com.nwd.audioset/.home_horizontalActivity";
@@ -34,9 +30,8 @@ public class MainActivity extends Activity implements NowPlaying.Listener {
     private final RadioClient radio = new RadioClient();
     private NowPlaying nowPlaying;
 
-    private TextView greeting, weatherTemp, weatherDesc, weatherCity, weatherExtra;
+    private TextView weatherTemp;
     private ImageView weatherIcon;
-    private GradientDrawable weatherBg;
     private ImageView car, carLights;
     private TextView oilInfo;
     private GradientDrawable oilBg;
@@ -50,24 +45,30 @@ public class MainActivity extends Activity implements NowPlaying.Listener {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        // Layout: left icon sidebar + main area (status bar, then a 2x2 grid of cards).
         LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(16), dp(14), dp(16), dp(4));
+        root.setOrientation(LinearLayout.HORIZONTAL);
+        root.setPadding(0, dp(10), dp(12), dp(10));
         root.setBackground(Ui.background(this));
 
-        LinearLayout cards = new LinearLayout(this);
-        cards.addView(buildWeatherCard(), weight(1.2f, 0));
+        root.addView(buildSidebar(), new LinearLayout.LayoutParams(dp(64), -1));
 
-        LinearLayout middle = new LinearLayout(this);
-        middle.setOrientation(LinearLayout.VERTICAL);
-        middle.addView(buildClockCard(), vweight(0.62f, 0));
-        middle.addView(buildFmCard(), vweight(1.38f, dp(12)));
-        cards.addView(middle, weight(1f, dp(12)));
+        LinearLayout main = new LinearLayout(this);
+        main.setOrientation(LinearLayout.VERTICAL);
+        main.setPadding(dp(12), 0, 0, 0);
+        main.addView(buildStatusBar(), new LinearLayout.LayoutParams(-1, dp(40)));
 
-        cards.addView(buildMusicCard(), weight(1.05f, dp(12)));
-        root.addView(cards, new LinearLayout.LayoutParams(-1, 0, 1f));
+        LinearLayout row1 = new LinearLayout(this);
+        row1.addView(buildMapCard(), weight(1.25f, 0));
+        row1.addView(buildFmCard(), weight(1f, dp(12)));
+        main.addView(row1, vweight(1f, dp(8)));
 
-        root.addView(buildDock(), new LinearLayout.LayoutParams(-1, dp(84)));
+        LinearLayout row2 = new LinearLayout(this);
+        row2.addView(buildMusicCard(), weight(1f, 0));
+        row2.addView(buildAppsCard(), weight(1.25f, dp(12)));
+        main.addView(row2, vweight(1f, dp(12)));
+
+        root.addView(main, new LinearLayout.LayoutParams(0, -1, 1f));
         setContentView(root);
 
         radio.bind(this);
@@ -77,84 +78,76 @@ public class MainActivity extends Activity implements NowPlaying.Listener {
         startService(new Intent(this, Odometer.class));
     }
 
-    // ---------- Greeting + weather ----------
+    // ---------- Sidebar ----------
 
-    private View buildWeatherCard() {
-        LinearLayout card = new LinearLayout(this);
-        card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(26), dp(24), dp(26), dp(22));
-        weatherBg = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{0x993FA9FF, 0x667B4DFF});
-        weatherBg.setCornerRadius(dp(18));
-        weatherBg.setStroke(dp(1), 0x447FD8FF);
-        card.setBackground(weatherBg);
+    private View buildSidebar() {
+        LinearLayout bar = new LinearLayout(this);
+        bar.setOrientation(LinearLayout.VERTICAL);
+        bar.setGravity(Gravity.CENTER_HORIZONTAL);
+        bar.setBackgroundColor(0x33000000);
+        bar.setPadding(0, dp(6), 0, dp(6));
 
-        TextView hello = left(Ui.text(this, "Hola, " + NAME, 34, Color.WHITE));
-        hello.setTypeface(Typeface.DEFAULT_BOLD);
-        card.addView(hello);
+        RingView ring = new RingView(this);
+        bar.addView(ring, new LinearLayout.LayoutParams(dp(44), dp(44)));
+        Ui.pressable(ring, 0.88f);
+        ring.setOnClickListener(v -> startActivity(new Intent(this, AppsActivity.class)));
 
-        greeting = left(Ui.text(this, "", 17, 0xCCFFFFFF));
-        greeting.setPadding(0, dp(4), 0, 0);
-        card.addView(greeting);
-
-        // The user's own car (photo with background removed); headlights glow when the car's lights are on.
-        FrameLayout carBox = new FrameLayout(this);
-        car = new ImageView(this);
-        car.setImageResource(R.drawable.optra);
-        car.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        carBox.addView(car, new FrameLayout.LayoutParams(-1, -1));
-        carLights = new ImageView(this);
-        carLights.setImageResource(R.drawable.optra_lights);
-        carLights.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        carLights.setAlpha(0f);
-        carBox.addView(carLights, new FrameLayout.LayoutParams(-1, -1));
-        LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(-1, 0, 1f);
-        clp.setMargins(dp(30), dp(8), dp(30), dp(8));
-        card.addView(carBox, clp);
-
-        // Compact weather row: icon + temperature + description, leaving room for the car.
-        LinearLayout now = new LinearLayout(this);
-        now.setGravity(Gravity.CENTER_VERTICAL);
-        weatherIcon = new ImageView(this);
-        weatherIcon.setImageResource(R.drawable.ic_w_cloud);
-        weatherIcon.setColorFilter(0xFFFFE07A);
-        now.addView(weatherIcon, new LinearLayout.LayoutParams(dp(54), dp(54)));
-        weatherTemp = left(Ui.text(this, "--°", 50, Color.WHITE));
-        weatherTemp.setTypeface(Typeface.create("sans-serif-light", Typeface.NORMAL));
-        weatherTemp.setIncludeFontPadding(false);
-        weatherTemp.setPadding(dp(10), 0, dp(12), 0);
-        now.addView(weatherTemp);
-
-        LinearLayout texts = new LinearLayout(this);
-        texts.setOrientation(LinearLayout.VERTICAL);
-        weatherDesc = left(Ui.text(this, "Cargando el clima…", 16, Color.WHITE));
-        weatherDesc.setSingleLine(false);
-        weatherDesc.setMaxLines(2);
-        texts.addView(weatherDesc);
-        weatherCity = left(Ui.text(this, "", 13, 0xB3FFFFFF));
-        weatherCity.setPadding(0, dp(2), 0, 0);
-        texts.addView(weatherCity);
-        now.addView(texts, new LinearLayout.LayoutParams(0, -2, 1f));
-        card.addView(now);
-
-        weatherExtra = left(Ui.text(this, "", 14, 0xE6FFFFFF));
-        weatherExtra.setPadding(dp(14), dp(8), dp(14), dp(8));
-        GradientDrawable chip = new GradientDrawable();
-        chip.setColor(0x26FFFFFF);
-        chip.setCornerRadius(dp(20));
-        weatherExtra.setBackground(chip);
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
-        lp.topMargin = dp(10);
-        card.addView(weatherExtra, lp);
-
-        Ui.pressable(card, 0.98f);
-        card.setOnClickListener(v -> fetchWeather(true));
-        return card;
+        bar.addView(sideIcon(R.drawable.ic_compass, () -> Ui.launch(this, MAPS)));
+        bar.addView(sideIcon(R.drawable.ic_bluetooth, () -> startActivity(new Intent(this, BtActivity.class))));
+        bar.addView(sideIcon(R.drawable.ic_radio, () -> startActivity(new Intent(this, RadioActivity.class))));
+        bar.addView(sideIcon(R.drawable.ic_w_moon, () -> startActivity(new Intent(this, ScreenOffActivity.class))));
+        bar.addView(sideIcon(R.drawable.ic_gear, () -> Ui.launch(this, SETTINGS)));
+        return bar;
     }
 
-    private void updateGreeting() {
-        int h = Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
-        greeting.setText((h < 12 ? "Buenos días" : h < 19 ? "Buenas tardes" : "Buenas noches")
-                + " · Bienvenido");
+    private View sideIcon(int icon, Runnable action) {
+        ImageView iv = new ImageView(this);
+        iv.setImageResource(icon);
+        iv.setColorFilter(0xE6FFFFFF);
+        iv.setPadding(dp(12), dp(12), dp(12), dp(12));
+        Ui.pressable(iv, 0.85f);
+        iv.setOnClickListener(v -> action.run());
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(56), dp(56));
+        lp.topMargin = dp(8);
+        iv.setLayoutParams(lp);
+        return iv;
+    }
+
+    // ---------- Status bar (clock + weather + Bluetooth) ----------
+
+    private View buildStatusBar() {
+        LinearLayout bar = new LinearLayout(this);
+        bar.setOrientation(LinearLayout.HORIZONTAL);
+        bar.setGravity(Gravity.CENTER_VERTICAL);
+
+        TextClock time = new TextClock(this);
+        time.setFormat24Hour("HH:mm");
+        time.setFormat12Hour("hh:mm a");
+        time.setTextSize(17);
+        time.setTextColor(Color.WHITE);
+        time.setTypeface(Typeface.DEFAULT_BOLD);
+        time.setIncludeFontPadding(false);
+        bar.addView(time, new LinearLayout.LayoutParams(-2, -2));
+
+        View spacer = new View(this);
+        bar.addView(spacer, new LinearLayout.LayoutParams(0, 1, 1f));
+
+        weatherIcon = new ImageView(this);
+        weatherIcon.setImageResource(R.drawable.ic_w_cloud);
+        weatherIcon.setColorFilter(Color.WHITE);
+        bar.addView(weatherIcon, new LinearLayout.LayoutParams(dp(20), dp(20)));
+
+        weatherTemp = Ui.text(this, "--°", 15, Color.WHITE);
+        weatherTemp.setPadding(dp(6), 0, dp(18), 0);
+        bar.addView(weatherTemp, new LinearLayout.LayoutParams(-2, -2));
+
+        bar.addView(Ui.iconButton(this, R.drawable.ic_bluetooth, 36, false,
+                () -> startActivity(new Intent(this, BtActivity.class))),
+                new LinearLayout.LayoutParams(dp(36), dp(36)));
+
+        Ui.pressable(weatherTemp, 0.98f);
+        weatherTemp.setOnClickListener(v -> fetchWeather(true));
+        return bar;
     }
 
     private void showWeather(Weather w) {
@@ -163,11 +156,6 @@ public class MainActivity extends Activity implements NowPlaying.Listener {
         weatherIcon.setColorFilter(w.icon() == R.drawable.ic_w_sun ? 0xFFFFD25A
                 : w.icon() == R.drawable.ic_w_moon ? 0xFFDDE4FF : Color.WHITE);
         weatherTemp.setText(w.temp + "°");
-        weatherDesc.setText(w.description());
-        weatherCity.setText(w.city.isEmpty() ? "Sensación " + w.feelsLike + "°"
-                : w.city + " · Sensación " + w.feelsLike + "°");
-        weatherExtra.setText("↑ " + w.max + "°   ↓ " + w.min + "°   💧 " + w.humidity + "%   " + w.wind + " km/h");
-        weatherBg.setColors(w.isDay ? new int[]{0x993FA9FF, 0x667B4DFF} : new int[]{0x8C2A3A9E, 0x80261A6E});
     }
 
     private void fetchWeather(boolean force) {
@@ -179,7 +167,6 @@ public class MainActivity extends Activity implements NowPlaying.Listener {
 
     private final Runnable periodic = new Runnable() {
         public void run() {
-            updateGreeting();
             fetchWeather(false);
             handler.postDelayed(this, 60 * 1000);
         }
@@ -218,32 +205,38 @@ public class MainActivity extends Activity implements NowPlaying.Listener {
         oilBg.setColor(left < 0 ? 0xCCE53935 : left <= Odometer.WARN_KM ? 0xCCFF9800 : 0x26FFFFFF);
     }
 
-    // ---------- Clock ----------
+    // ---------- Map (car photo + navigation shortcut) ----------
 
-    private View buildClockCard() {
-        LinearLayout card = new LinearLayout(this);
-        card.setOrientation(LinearLayout.VERTICAL);
-        card.setGravity(Gravity.CENTER);
+    private View buildMapCard() {
+        FrameLayout card = new FrameLayout(this);
         card.setBackground(Ui.card(this));
+        card.setClipToOutline(true);
 
-        TextClock time = new TextClock(this);
-        time.setFormat24Hour("HH:mm");
-        time.setFormat12Hour("hh:mm");
-        time.setTextSize(40);
-        time.setTextColor(Color.WHITE);
-        time.setTypeface(Typeface.DEFAULT_BOLD);
-        time.setIncludeFontPadding(false);
-        time.setGravity(Gravity.CENTER);
-        card.addView(time);
+        // The user's own car (photo with background removed); headlights glow when the car's lights are on.
+        FrameLayout carBox = new FrameLayout(this);
+        car = new ImageView(this);
+        car.setImageResource(R.drawable.optra);
+        car.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        carBox.addView(car, new FrameLayout.LayoutParams(-1, -1));
+        carLights = new ImageView(this);
+        carLights.setImageResource(R.drawable.optra_lights);
+        carLights.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        carLights.setAlpha(0f);
+        carBox.addView(carLights, new FrameLayout.LayoutParams(-1, -1));
+        FrameLayout.LayoutParams clp = new FrameLayout.LayoutParams(-1, -1);
+        clp.setMargins(dp(30), dp(40), dp(30), dp(40));
+        card.addView(carBox, clp);
 
-        TextClock date = new TextClock(this);
-        date.setFormat24Hour("EEEE, d 'de' MMMM");
-        date.setFormat12Hour("EEEE, d 'de' MMMM");
-        date.setTextSize(14);
-        date.setTextColor(0xCCFFFFFF);
-        date.setPadding(0, dp(6), 0, 0);
-        date.setGravity(Gravity.CENTER);
-        card.addView(date);
+        TextView label = Ui.text(this, "NAVEGACIÓN", 12, Color.WHITE);
+        label.setLetterSpacing(0.1f);
+        label.setPadding(dp(12), dp(5), dp(12), dp(5));
+        GradientDrawable chip = new GradientDrawable();
+        chip.setColor(0x40000000);
+        chip.setCornerRadius(dp(14));
+        label.setBackground(chip);
+        FrameLayout.LayoutParams llp = new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.START);
+        llp.setMargins(dp(12), dp(12), 0, 0);
+        card.addView(label, llp);
 
         // Oil-change status pill; opens the oil screen.
         oilInfo = Ui.text(this, "", 13, Color.WHITE);
@@ -253,12 +246,12 @@ public class MainActivity extends Activity implements NowPlaying.Listener {
         oilInfo.setBackground(oilBg);
         Ui.pressable(oilInfo, 0.92f);
         oilInfo.setOnClickListener(v -> startActivity(new Intent(this, OilActivity.class)));
-        LinearLayout.LayoutParams olp = new LinearLayout.LayoutParams(-2, -2);
-        olp.topMargin = dp(8);
+        FrameLayout.LayoutParams olp = new FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM | Gravity.START);
+        olp.setMargins(dp(12), 0, 0, dp(12));
         card.addView(oilInfo, olp);
 
-        Ui.pressable(card, 0.97f);
-        card.setOnClickListener(v -> Ui.launch(this, SETTINGS));
+        Ui.pressable(card, 0.98f);
+        card.setOnClickListener(v -> Ui.launch(this, MAPS));
         return card;
     }
 
@@ -353,24 +346,24 @@ public class MainActivity extends Activity implements NowPlaying.Listener {
 
         LinearLayout bottom = new LinearLayout(this);
         bottom.setOrientation(LinearLayout.VERTICAL);
-        bottom.setPadding(dp(16), 0, dp(16), dp(18));
-        songTitle = Ui.text(this, "", 21, Color.WHITE);
+        bottom.setPadding(dp(16), 0, dp(16), dp(14));
+        songTitle = Ui.text(this, "", 19, Color.WHITE);
         songTitle.setTypeface(Typeface.DEFAULT_BOLD);
         bottom.addView(songTitle);
-        songArtist = Ui.text(this, "", 15, 0xCCFFFFFF);
-        songArtist.setPadding(0, dp(2), 0, dp(14));
+        songArtist = Ui.text(this, "", 14, 0xCCFFFFFF);
+        songArtist.setPadding(0, dp(2), 0, dp(10));
         bottom.addView(songArtist);
 
         LinearLayout controls = new LinearLayout(this);
         controls.setGravity(Gravity.CENTER);
-        controls.addView(Ui.iconButton(this, R.drawable.ic_prev, 50, false, () -> nowPlaying.skip(false)),
-                new LinearLayout.LayoutParams(dp(50), dp(50)));
-        playBtn = Ui.iconButton(this, R.drawable.ic_play, 66, true, () -> nowPlaying.playPause());
-        LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(dp(66), dp(66));
-        plp.setMargins(dp(18), 0, dp(18), 0);
+        controls.addView(Ui.iconButton(this, R.drawable.ic_prev, 46, false, () -> nowPlaying.skip(false)),
+                new LinearLayout.LayoutParams(dp(46), dp(46)));
+        playBtn = Ui.iconButton(this, R.drawable.ic_play, 60, true, () -> nowPlaying.playPause());
+        LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(dp(60), dp(60));
+        plp.setMargins(dp(16), 0, dp(16), 0);
         controls.addView(playBtn, plp);
-        controls.addView(Ui.iconButton(this, R.drawable.ic_next, 50, false, () -> nowPlaying.skip(true)),
-                new LinearLayout.LayoutParams(dp(50), dp(50)));
+        controls.addView(Ui.iconButton(this, R.drawable.ic_next, 46, false, () -> nowPlaying.skip(true)),
+                new LinearLayout.LayoutParams(dp(46), dp(46)));
         bottom.addView(controls);
         card.addView(bottom, new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM));
 
@@ -396,7 +389,7 @@ public class MainActivity extends Activity implements NowPlaying.Listener {
             art.setAlpha(1f);
             art.setImageBitmap(t.art);
         } else {
-            art.setPadding(dp(80), dp(56), dp(80), dp(170));
+            art.setPadding(dp(80), dp(40), dp(80), dp(120));
             art.setScaleType(ImageView.ScaleType.FIT_CENTER);
             art.setImageResource(s == NowPlaying.Source.BT ? R.drawable.ic_bluetooth : R.drawable.ic_music);
             art.setColorFilter(Color.WHITE);
@@ -404,41 +397,61 @@ public class MainActivity extends Activity implements NowPlaying.Listener {
         }
     }
 
-    // ---------- Dock ----------
+    // ---------- Apps (shortcut tiles) ----------
 
-    private View buildDock() {
-        LinearLayout dock = new LinearLayout(this);
-        dock.setGravity(Gravity.CENTER_VERTICAL);
-        dock.addView(dockIcon(R.drawable.ic_compass, () -> Ui.launch(this, MAPS)), weight(1f, 0));
-        dock.addView(dockIcon(R.drawable.ic_bluetooth,
-                () -> startActivity(new Intent(this, BtActivity.class))), weight(1f, 0));
-        dock.addView(dockIcon(R.drawable.ic_radio,
-                () -> startActivity(new Intent(this, RadioActivity.class))), weight(1f, 0));
+    private View buildAppsCard() {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(14), dp(12), dp(14), dp(12));
+        card.setBackground(Ui.card(this));
 
-        FrameLayout center = new FrameLayout(this);
-        RingView ring = new RingView(this);
-        center.addView(ring, new FrameLayout.LayoutParams(dp(64), dp(64), Gravity.CENTER));
-        Ui.pressable(ring, 0.88f);
-        ring.setOnClickListener(v -> startActivity(new Intent(this, AppsActivity.class)));
-        dock.addView(center, weight(1f, 0));
+        TextView title = Ui.text(this, "APLICACIONES", 12, 0xB3FFFFFF);
+        title.setLetterSpacing(0.1f);
+        title.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+        card.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
-        dock.addView(dockIcon(R.drawable.ic_w_moon,
-                () -> startActivity(new Intent(this, ScreenOffActivity.class))), weight(1f, 0));
-        dock.addView(dockIcon(R.drawable.ic_settings, () -> Ui.launch(this, EQ)), weight(1f, 0));
-        dock.addView(dockIcon(R.drawable.ic_gear, () -> Ui.launch(this, SETTINGS)), weight(1f, 0));
-        return dock;
+        LinearLayout row1 = new LinearLayout(this);
+        row1.addView(buildTile(R.drawable.ic_compass, "Mapas", 0xFF4D8DFF,
+                () -> Ui.launch(this, MAPS)), weight(1f, 0));
+        row1.addView(buildTile(R.drawable.ic_bluetooth, "Bluetooth", 0xFF5AA9FF,
+                () -> startActivity(new Intent(this, BtActivity.class))), weight(1f, dp(8)));
+        row1.addView(buildTile(R.drawable.ic_radio, "Radio", 0xFFFF9F5A,
+                () -> startActivity(new Intent(this, RadioActivity.class))), weight(1f, dp(8)));
+        card.addView(row1, vweight(1f, dp(8)));
+
+        LinearLayout row2 = new LinearLayout(this);
+        row2.addView(buildTile(R.drawable.ic_music, "Música", 0xFFC04DE8,
+                () -> nowPlaying.open(this)), weight(1f, 0));
+        row2.addView(buildTile(R.drawable.ic_eq, "Ecualizador", 0xFF2EC4B6,
+                () -> Ui.launch(this, EQ)), weight(1f, dp(8)));
+        row2.addView(buildTile(R.drawable.ic_add, "Más apps", 0xFF8E6BFF,
+                () -> startActivity(new Intent(this, AppsActivity.class))), weight(1f, dp(8)));
+        card.addView(row2, vweight(1f, dp(10)));
+
+        return card;
     }
 
-    private View dockIcon(int icon, Runnable action) {
-        FrameLayout f = new FrameLayout(this);
+    private View buildTile(int icon, String label, int tint, Runnable action) {
+        LinearLayout tile = new LinearLayout(this);
+        tile.setOrientation(LinearLayout.VERTICAL);
+        tile.setGravity(Gravity.CENTER);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setCornerRadius(dp(14));
+        bg.setColor(0x22FFFFFF);
+        tile.setBackground(bg);
+
         ImageView iv = new ImageView(this);
         iv.setImageResource(icon);
-        iv.setColorFilter(0xE6FFFFFF);
-        iv.setPadding(dp(12), dp(12), dp(12), dp(12));
-        f.addView(iv, new FrameLayout.LayoutParams(dp(56), dp(56), Gravity.CENTER));
-        Ui.pressable(iv, 0.85f);
-        iv.setOnClickListener(v -> action.run());
-        return f;
+        iv.setColorFilter(tint);
+        tile.addView(iv, new LinearLayout.LayoutParams(dp(32), dp(32)));
+
+        TextView tv = Ui.text(this, label, 12, Color.WHITE);
+        tv.setPadding(0, dp(6), 0, 0);
+        tile.addView(tv, new LinearLayout.LayoutParams(-2, -2));
+
+        Ui.pressable(tile, 0.94f);
+        tile.setOnClickListener(v -> action.run());
+        return tile;
     }
 
     // ---------- Lifecycle & helpers ----------
@@ -446,7 +459,6 @@ public class MainActivity extends Activity implements NowPlaying.Listener {
     @Override
     protected void onResume() {
         super.onResume();
-        updateGreeting();
         updateOil();
         showWeather(Weather.cached(this));
         registerReceiver(illReceiver, new android.content.IntentFilter("com.nwd.ACTION_ILL_STATE_CHANGE"));
@@ -481,11 +493,6 @@ public class MainActivity extends Activity implements NowPlaying.Listener {
     protected void onDestroy() {
         super.onDestroy();
         radio.unbind(this);
-    }
-
-    private TextView left(TextView tv) {
-        tv.setGravity(Gravity.START);
-        return tv;
     }
 
     private LinearLayout.LayoutParams weight(float w, int left) {
