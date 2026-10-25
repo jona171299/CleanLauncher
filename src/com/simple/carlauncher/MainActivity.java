@@ -319,7 +319,7 @@ public class MainActivity extends Activity implements NowPlaying.Listener {
     private View buildMusicCard() {
         FrameLayout card = new FrameLayout(this);
         GradientDrawable bg = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{0xFF6A3BFF, 0xFFC04DE8, 0xFF2B1A7A});
+                new int[]{0xFF2A2A2A, 0xFF0E0E0E});
         bg.setCornerRadius(dp(18));
         card.setBackground(bg);
         card.setClipToOutline(true);
